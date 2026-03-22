@@ -209,6 +209,7 @@ export default function App() {
 
       {/* Main content */}
       <main className="flex-1 overflow-y-auto pb-24 max-w-lg mx-auto w-full">
+        <div key={activeTab} className="animate-tab-enter">
         {activeTab === 'clicker' && (
           <ClickerPage balance={balance} onEarn={handleEarn} totalClicks={totalClicks} sessionEarned={sessionEarned} />
         )}
@@ -222,6 +223,7 @@ export default function App() {
         {activeTab === 'profile' && (
           <ProfilePage profile={profile} onUpdateProfile={handleUpdateProfile} balance={balance} totalClicks={totalClicks} />
         )}
+        </div>
       </main>
 
       {/* Bottom navigation */}
