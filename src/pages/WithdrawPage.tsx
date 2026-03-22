@@ -15,8 +15,6 @@ const BANKS = [
     bgColor: 'rgba(33, 160, 56, 0.12)',
     borderColor: 'rgba(33, 160, 56, 0.3)',
     logo: '🟢',
-    placeholder: '79XXXXXXXXX или номер счёта',
-    hint: 'Номер карты, телефона или расчётного счёта'
   },
   {
     id: 'vtb',
@@ -26,8 +24,6 @@ const BANKS = [
     bgColor: 'rgba(0, 159, 223, 0.12)',
     borderColor: 'rgba(0, 159, 223, 0.3)',
     logo: '🔵',
-    placeholder: 'Номер карты или счёта ВТБ',
-    hint: '20-значный номер счёта или номер карты'
   },
   {
     id: 'rshb',
@@ -37,26 +33,54 @@ const BANKS = [
     bgColor: 'rgba(0, 132, 61, 0.12)',
     borderColor: 'rgba(0, 132, 61, 0.3)',
     logo: '🌾',
-    placeholder: 'Номер счёта Россельхозбанка',
-    hint: '20-значный номер расчётного счёта'
   },
   {
-    id: 'ymoney',
-    name: 'ЮMoney',
-    shortName: 'ЮMoney',
+    id: 'tinkoff',
+    name: 'Т-Банк',
+    shortName: 'Т-Банк',
+    color: '#FFDD2D',
+    bgColor: 'rgba(255, 221, 45, 0.1)',
+    borderColor: 'rgba(255, 221, 45, 0.3)',
+    logo: '🟡',
+  },
+  {
+    id: 'alfa',
+    name: 'Альфа-Банк',
+    shortName: 'Альфа',
+    color: '#EF3124',
+    bgColor: 'rgba(239, 49, 36, 0.1)',
+    borderColor: 'rgba(239, 49, 36, 0.3)',
+    logo: '🔴',
+  },
+  {
+    id: 'other',
+    name: 'Другой банк',
+    shortName: 'Другой',
     color: '#8B5CF6',
-    bgColor: 'rgba(139, 92, 246, 0.12)',
+    bgColor: 'rgba(139, 92, 246, 0.1)',
     borderColor: 'rgba(139, 92, 246, 0.3)',
-    logo: '💜',
-    placeholder: 'Номер кошелька ЮMoney',
-    hint: '15-значный номер кошелька ЮMoney'
+    logo: '🏦',
   },
 ];
+
+function formatCardNumber(value: string): string {
+  const digits = value.replace(/\D/g, '').slice(0, 16);
+  return digits.replace(/(\d{4})(?=\d)/g, '$1 ');
+}
+
+function getCardSystem(cardNumber: string): string {
+  const digits = cardNumber.replace(/\s/g, '');
+  if (/^4/.test(digits)) return 'Visa';
+  if (/^5[1-5]/.test(digits) || /^2[2-7]/.test(digits)) return 'Mastercard / Мир';
+  if (/^2/.test(digits)) return 'Мир';
+  return '';
+}
 
 export default function WithdrawPage({ balance, onWithdraw }: WithdrawPageProps) {
   const [selectedBank, setSelectedBank] = useState<string | null>(null);
   const [amount, setAmount] = useState('');
-  const [account, setAccount] = useState('');
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardHolder, setCardHolder] = useState('');
   const [success, setSuccess] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState('');
@@ -67,23 +91,35 @@ export default function WithdrawPage({ balance, onWithdraw }: WithdrawPageProps)
   const amountNum = parseFloat(amount) || 0;
   const commission = amountNum * COMMISSION;
   const toReceive = amountNum - commission;
-  const canWithdraw = selectedBank && amountNum >= MIN_WITHDRAW && amountNum <= balance && account.length >= 10 && !processing;
+  const rawCard = cardNumber.replace(/\s/g, '');
+  const cardValid = rawCard.length === 16;
+  const holderValid = cardHolder.trim().length >= 2;
+  const canWithdraw =
+    selectedBank && amountNum >= MIN_WITHDRAW && amountNum <= balance && cardValid && holderValid && !processing;
 
   const bank = BANKS.find(b => b.id === selectedBank);
+  const cardSystem = getCardSystem(cardNumber);
 
   const formatBalance = (v: number) =>
     new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
+
+  const handleCardInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setCardNumber(formatCardNumber(e.target.value));
+  };
 
   const handleWithdraw = async () => {
     if (!canWithdraw || !selectedBank) return;
     setProcessing(true);
     setError('');
     try {
+      const account = `${cardNumber} (${cardHolder.trim()})`;
       await onWithdraw(amountNum, selectedBank, account);
       setSuccess(true);
       setAmount('');
-      setAccount('');
-      setTimeout(() => setSuccess(false), 5000);
+      setCardNumber('');
+      setCardHolder('');
+      setSelectedBank(null);
+      setTimeout(() => setSuccess(false), 6000);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Ошибка вывода. Попробуйте снова.');
     } finally {
@@ -110,13 +146,12 @@ export default function WithdrawPage({ balance, onWithdraw }: WithdrawPageProps)
           <p className="text-xs text-muted-foreground mb-0.5">Доступно к выводу</p>
           <p className="font-oswald text-2xl font-bold gold-text">{formatBalance(balance)} ₽</p>
         </div>
-        {balance < MIN_WITHDRAW && (
+        {balance < MIN_WITHDRAW ? (
           <div className="flex items-center gap-1.5 text-xs text-amber-400">
             <Icon name="AlertCircle" size={14} />
             <span>Мин. {MIN_WITHDRAW} ₽</span>
           </div>
-        )}
-        {balance >= MIN_WITHDRAW && (
+        ) : (
           <div className="flex items-center gap-1.5 text-xs text-green-400">
             <Icon name="CheckCircle2" size={14} />
             <span>Вывод доступен</span>
@@ -131,8 +166,8 @@ export default function WithdrawPage({ balance, onWithdraw }: WithdrawPageProps)
             <Icon name="CheckCircle" size={18} className="text-green-400" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-green-400">Заявка принята! Обработка ~5 минут</p>
-            <p className="text-xs text-muted-foreground">Средства поступят на счёт банка в течение 5 минут</p>
+            <p className="text-sm font-semibold text-green-400">Заявка принята!</p>
+            <p className="text-xs text-muted-foreground">Деньги поступят на карту в течение 5 минут</p>
           </div>
         </div>
       )}
@@ -152,14 +187,14 @@ export default function WithdrawPage({ balance, onWithdraw }: WithdrawPageProps)
 
       {/* Bank selection */}
       <div className="mb-5">
-        <p className="text-sm text-muted-foreground mb-3 font-golos">Выберите банк</p>
-        <div className="grid grid-cols-2 gap-2.5">
+        <p className="text-sm text-muted-foreground mb-3 font-golos">Банк получателя</p>
+        <div className="grid grid-cols-3 gap-2">
           {BANKS.map(b => (
             <button
               key={b.id}
               onClick={() => setSelectedBank(b.id)}
-              className={`relative p-3.5 rounded-xl border text-left transition-all duration-200 ${
-                selectedBank === b.id ? 'scale-[1.02]' : 'hover:scale-[1.01]'
+              className={`relative p-3 rounded-xl border text-left transition-all duration-200 ${
+                selectedBank === b.id ? 'scale-[1.03]' : 'hover:scale-[1.01]'
               }`}
               style={{
                 background: selectedBank === b.id ? b.bgColor : 'hsl(var(--card))',
@@ -168,22 +203,64 @@ export default function WithdrawPage({ balance, onWithdraw }: WithdrawPageProps)
               }}
             >
               {selectedBank === b.id && (
-                <div className="absolute top-2 right-2">
-                  <div className="w-4 h-4 rounded-full flex items-center justify-center" style={{ background: b.color }}>
-                    <Icon name="Check" size={10} className="text-white" />
+                <div className="absolute top-1.5 right-1.5">
+                  <div className="w-3.5 h-3.5 rounded-full flex items-center justify-center" style={{ background: b.color }}>
+                    <Icon name="Check" size={8} className="text-white" />
                   </div>
                 </div>
               )}
-              <span className="text-xl mb-1.5 block">{b.logo}</span>
-              <p className="text-sm font-semibold text-foreground">{b.shortName}</p>
-              <p className="text-xs text-muted-foreground">{b.name}</p>
+              <span className="text-lg mb-1 block">{b.logo}</span>
+              <p className="text-xs font-semibold text-foreground leading-tight">{b.shortName}</p>
             </button>
           ))}
         </div>
       </div>
 
-      {/* Amount input */}
+      {/* Card number input */}
       <div className="mb-4">
+        <p className="text-sm text-muted-foreground mb-2 font-golos">Номер карты</p>
+        <div className="relative">
+          <input
+            type="text"
+            inputMode="numeric"
+            value={cardNumber}
+            onChange={handleCardInput}
+            placeholder="0000 0000 0000 0000"
+            maxLength={19}
+            className="w-full bg-input border border-border rounded-xl px-4 py-3.5 pr-24 text-foreground font-oswald text-lg tracking-widest focus:outline-none focus:border-yellow-500/50 focus:ring-1 focus:ring-yellow-500/20 transition-all"
+          />
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+            {cardValid && (
+              <Icon name="CheckCircle2" size={16} className="text-green-400" />
+            )}
+            {cardSystem && (
+              <span className="text-xs text-muted-foreground">{cardSystem}</span>
+            )}
+          </div>
+        </div>
+        {cardNumber.length > 0 && !cardValid && (
+          <p className="text-xs text-amber-400 mt-1.5 flex items-center gap-1">
+            <Icon name="Info" size={11} />
+            Введите все 16 цифр карты
+          </p>
+        )}
+      </div>
+
+      {/* Cardholder name */}
+      <div className="mb-4">
+        <p className="text-sm text-muted-foreground mb-2 font-golos">Имя владельца карты</p>
+        <input
+          type="text"
+          value={cardHolder}
+          onChange={e => setCardHolder(e.target.value.toUpperCase())}
+          placeholder="IVAN IVANOV"
+          className="w-full bg-input border border-border rounded-xl px-4 py-3.5 text-foreground font-oswald tracking-wider focus:outline-none focus:border-yellow-500/50 focus:ring-1 focus:ring-yellow-500/20 transition-all uppercase"
+        />
+        <p className="text-xs text-muted-foreground mt-1.5">Латинскими буквами, как на карте</p>
+      </div>
+
+      {/* Amount input */}
+      <div className="mb-5">
         <p className="text-sm text-muted-foreground mb-2 font-golos">Сумма вывода</p>
         <div className="relative">
           <input
@@ -194,7 +271,6 @@ export default function WithdrawPage({ balance, onWithdraw }: WithdrawPageProps)
             min={MIN_WITHDRAW}
             max={balance}
             className="w-full bg-input border border-border rounded-xl px-4 py-3.5 pr-24 text-foreground font-oswald text-lg focus:outline-none focus:border-yellow-500/50 focus:ring-1 focus:ring-yellow-500/20 transition-all"
-            style={{ fontSize: 20 }}
           />
           <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
             <button
@@ -209,20 +285,40 @@ export default function WithdrawPage({ balance, onWithdraw }: WithdrawPageProps)
         </div>
       </div>
 
-      {/* Account input */}
-      <div className="mb-5">
-        <p className="text-sm text-muted-foreground mb-2 font-golos">
-          {bank ? bank.hint : 'Реквизиты для вывода'}
-        </p>
-        <input
-          type="text"
-          value={account}
-          onChange={e => setAccount(e.target.value)}
-          placeholder={bank ? bank.placeholder : 'Сначала выберите банк'}
-          disabled={!selectedBank}
-          className="w-full bg-input border border-border rounded-xl px-4 py-3.5 text-foreground font-golos focus:outline-none focus:border-yellow-500/50 focus:ring-1 focus:ring-yellow-500/20 transition-all disabled:opacity-40"
-        />
-      </div>
+      {/* Card preview */}
+      {(cardValid || cardNumber.length > 0) && (
+        <div className="mb-5 animate-slide-up">
+          <div
+            className="rounded-2xl p-4 relative overflow-hidden"
+            style={{
+              background: bank
+                ? `linear-gradient(135deg, ${bank.color}22, ${bank.color}44)`
+                : 'linear-gradient(135deg, hsl(220 18% 14%), hsl(220 18% 18%))',
+              border: `1px solid ${bank ? bank.borderColor : 'hsl(var(--border))'}`,
+            }}
+          >
+            <div className="flex items-start justify-between mb-6">
+              <div>
+                <p className="text-xs text-muted-foreground">Банк</p>
+                <p className="text-sm font-semibold text-foreground">{bank?.name ?? '—'}</p>
+              </div>
+              <Icon name="CreditCard" size={22} className="text-muted-foreground" />
+            </div>
+            <p className="font-oswald text-xl tracking-widest text-foreground mb-3">
+              {cardNumber || '•••• •••• •••• ••••'}
+            </p>
+            <div className="flex items-end justify-between">
+              <div>
+                <p className="text-xs text-muted-foreground">Держатель</p>
+                <p className="text-sm font-semibold text-foreground">{cardHolder || '—'}</p>
+              </div>
+              {cardSystem && (
+                <p className="text-xs text-muted-foreground">{cardSystem}</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Calculation breakdown */}
       {amountNum > 0 && (
@@ -266,7 +362,7 @@ export default function WithdrawPage({ balance, onWithdraw }: WithdrawPageProps)
         ) : canWithdraw ? (
           `Вывести ${formatBalance(toReceive)} ₽`
         ) : (
-          `Выведите от ${MIN_WITHDRAW} ₽`
+          'Заполните все поля'
         )}
       </button>
 
