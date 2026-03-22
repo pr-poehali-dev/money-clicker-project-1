@@ -1,0 +1,13 @@
+{
+  "tests": [
+    {
+      "name": "GET user data",
+      "method": "GET",
+      "path": "/",
+      "headers": {"X-User-Id": "test-user-001"},
+      "expectedStatus": 200,
+      "expectedBody": {"balance": 0},
+      "bodyMatcher": "partial"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "tests": [
+    {
+      "name": "Earn coins",
+      "method": "POST",
+      "path": "/",
+      "headers": {"X-User-Id": "test-user-001"},
+      "body": {"clicks": 10, "amount": 100.0},
+      "expectedStatus": 200,
+      "expectedBody": {"ok": true},
+      "bodyMatcher": "partial"
+    }
+  ]
+}

@@ -3,7 +3,7 @@ import Icon from '@/components/ui/icon';
 
 interface WithdrawPageProps {
   balance: number;
-  onWithdraw: (amount: number, bank: string, account: string) => void;
+  onWithdraw: (amount: number, bank: string, account: string) => Promise<void>;
 }
 
 const BANKS = [
@@ -58,6 +58,8 @@ export default function WithdrawPage({ balance, onWithdraw }: WithdrawPageProps)
   const [amount, setAmount] = useState('');
   const [account, setAccount] = useState('');
   const [success, setSuccess] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const [error, setError] = useState('');
 
   const COMMISSION = 0.01;
   const MIN_WITHDRAW = 100;
@@ -65,20 +67,28 @@ export default function WithdrawPage({ balance, onWithdraw }: WithdrawPageProps)
   const amountNum = parseFloat(amount) || 0;
   const commission = amountNum * COMMISSION;
   const toReceive = amountNum - commission;
-  const canWithdraw = selectedBank && amountNum >= MIN_WITHDRAW && amountNum <= balance && account.length >= 10;
+  const canWithdraw = selectedBank && amountNum >= MIN_WITHDRAW && amountNum <= balance && account.length >= 10 && !processing;
 
   const bank = BANKS.find(b => b.id === selectedBank);
 
   const formatBalance = (v: number) =>
     new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
 
-  const handleWithdraw = () => {
+  const handleWithdraw = async () => {
     if (!canWithdraw || !selectedBank) return;
-    onWithdraw(amountNum, selectedBank, account);
-    setSuccess(true);
-    setAmount('');
-    setAccount('');
-    setTimeout(() => setSuccess(false), 3500);
+    setProcessing(true);
+    setError('');
+    try {
+      await onWithdraw(amountNum, selectedBank, account);
+      setSuccess(true);
+      setAmount('');
+      setAccount('');
+      setTimeout(() => setSuccess(false), 5000);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Ошибка вывода. Попробуйте снова.');
+    } finally {
+      setProcessing(false);
+    }
   };
 
   const setMaxAmount = () => {
@@ -121,8 +131,21 @@ export default function WithdrawPage({ balance, onWithdraw }: WithdrawPageProps)
             <Icon name="CheckCircle" size={18} className="text-green-400" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-green-400">Заявка на вывод создана!</p>
-            <p className="text-xs text-muted-foreground">Средства поступят в течение 1-3 рабочих дней</p>
+            <p className="text-sm font-semibold text-green-400">Заявка принята! Обработка ~5 минут</p>
+            <p className="text-xs text-muted-foreground">Средства поступят на счёт банка в течение 5 минут</p>
+          </div>
+        </div>
+      )}
+
+      {/* Error message */}
+      {error && (
+        <div className="mb-5 p-4 rounded-xl border border-red-500/30 bg-red-500/10 flex items-center gap-3 animate-slide-up">
+          <div className="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0">
+            <Icon name="AlertCircle" size={18} className="text-red-400" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-red-400">Ошибка вывода</p>
+            <p className="text-xs text-muted-foreground">{error}</p>
           </div>
         </div>
       )}
@@ -226,7 +249,7 @@ export default function WithdrawPage({ balance, onWithdraw }: WithdrawPageProps)
       <button
         onClick={handleWithdraw}
         disabled={!canWithdraw}
-        className="w-full py-4 rounded-xl font-oswald text-lg font-bold uppercase tracking-wide transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
+        className="w-full py-4 rounded-xl font-oswald text-lg font-bold uppercase tracking-wide transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         style={{
           background: canWithdraw
             ? 'linear-gradient(135deg, hsl(43 90% 55%), hsl(38 85% 42%))'
@@ -235,11 +258,20 @@ export default function WithdrawPage({ balance, onWithdraw }: WithdrawPageProps)
           boxShadow: canWithdraw ? '0 4px 20px hsl(43 90% 55% / 0.35)' : 'none',
         }}
       >
-        {canWithdraw ? `Вывести ${formatBalance(toReceive)} ₽` : `Выведите от ${MIN_WITHDRAW} ₽`}
+        {processing ? (
+          <>
+            <div className="w-5 h-5 rounded-full border-2 border-current border-t-transparent animate-spin" />
+            Отправка заявки...
+          </>
+        ) : canWithdraw ? (
+          `Вывести ${formatBalance(toReceive)} ₽`
+        ) : (
+          `Выведите от ${MIN_WITHDRAW} ₽`
+        )}
       </button>
 
       <p className="text-xs text-muted-foreground text-center mt-4">
-        Срок зачисления: 1–3 рабочих дня
+        Обработка перевода: ~5 минут · Комиссия 1%
       </p>
     </div>
   );

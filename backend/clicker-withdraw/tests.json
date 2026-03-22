@@ -1,0 +1,14 @@
+{
+  "tests": [
+    {
+      "name": "Withdraw - insufficient funds",
+      "method": "POST",
+      "path": "/",
+      "headers": {"X-User-Id": "test-user-001"},
+      "body": {"amount": 99.0, "bank": "sber", "account_number": "79991234567"},
+      "expectedStatus": 400,
+      "expectedBody": {"error": "Минимальная сумма вывода 100.0 ₽"},
+      "bodyMatcher": "partial"
+    }
+  ]
+}
