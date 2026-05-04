@@ -5,13 +5,13 @@ import StatsPage from '@/pages/StatsPage';
 import WithdrawPage from '@/pages/WithdrawPage';
 import HistoryPage from '@/pages/HistoryPage';
 import ProfilePage from '@/pages/ProfilePage';
-import { fetchUserData, earnCoins, withdrawFunds, updateProfile, ApiTransaction } from '@/lib/api';
+import { fetchUserData, earnCoins, withdrawFunds, updateProfile, createPayment, ApiTransaction } from '@/lib/api';
 
 type TabId = 'clicker' | 'stats' | 'withdraw' | 'history' | 'profile';
 
 export interface Transaction {
   id: string;
-  type: 'earn' | 'withdraw';
+  type: 'earn' | 'withdraw' | 'deposit';
   amount: number;
   date: Date;
   description: string;
@@ -130,6 +130,11 @@ export default function App() {
     }
   }, []);
 
+  const handleDeposit = useCallback(async (amount: number): Promise<{ payment_url: string; invoice_id: string }> => {
+    const res = await createPayment(amount);
+    return res;
+  }, []);
+
   const handleUpdateProfile = useCallback(async (p: UserProfile) => {
     setProfileState(p);
     await updateProfile({ name: p.name, email: p.email, phone: p.phone });
@@ -217,7 +222,7 @@ export default function App() {
           <StatsPage balance={balance} totalClicks={totalClicks} sessionEarned={sessionEarned} transactions={transactions} />
         )}
         {activeTab === 'withdraw' && (
-          <WithdrawPage balance={balance} onWithdraw={handleWithdraw} />
+          <WithdrawPage balance={balance} onWithdraw={handleWithdraw} onDeposit={handleDeposit} />
         )}
         {activeTab === 'history' && <HistoryPage transactions={transactions} />}
         {activeTab === 'profile' && (

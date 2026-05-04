@@ -1,5 +1,8 @@
 import func2url from '../../backend/func2url.json';
 
+ 
+const urls = func2url as Record<string, string>;
+
 // Stable user ID, stored in localStorage
 export function getUserId(): string {
   let uid = localStorage.getItem('clicker_user_id');
@@ -28,7 +31,7 @@ export interface UserData {
 
 export interface ApiTransaction {
   id: string;
-  type: 'earn' | 'withdraw';
+  type: 'earn' | 'withdraw' | 'deposit';
   amount: number;
   commission: number;
   bank?: string;
@@ -86,5 +89,26 @@ export async function withdrawFunds(
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Ошибка вывода');
+  return data;
+}
+
+export interface PaymentResult {
+  ok: boolean;
+  payment_url: string;
+  invoice_id: string;
+  amount: number;
+  is_test: boolean;
+}
+
+export async function createPayment(amount: number): Promise<PaymentResult> {
+  const url = urls['robokassa-payment'];
+  if (!url) throw new Error('Платёжный сервис временно недоступен');
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify({ amount }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Ошибка создания платежа');
   return data;
 }

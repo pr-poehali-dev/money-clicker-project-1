@@ -4,6 +4,7 @@ import Icon from '@/components/ui/icon';
 interface WithdrawPageProps {
   balance: number;
   onWithdraw: (amount: number, bank: string, account: string) => Promise<void>;
+  onDeposit: (amount: number) => Promise<{ payment_url: string; invoice_id: string; is_test: boolean }>;
 }
 
 type Method = 'card' | 'sbp';
@@ -54,8 +55,14 @@ function getCardSystem(cardNumber: string): string {
   return '';
 }
 
-export default function WithdrawPage({ balance, onWithdraw }: WithdrawPageProps) {
+const DEPOSIT_PRESETS = [100, 300, 500, 1000, 2000, 5000];
+
+export default function WithdrawPage({ balance, onWithdraw, onDeposit }: WithdrawPageProps) {
   const [method, setMethod] = useState<Method>('card');
+  const [showDeposit, setShowDeposit] = useState(false);
+  const [depositAmount, setDepositAmount] = useState('');
+  const [depositLoading, setDepositLoading] = useState(false);
+  const [depositError, setDepositError] = useState('');
 
   // Card fields
   const [selectedBank, setSelectedBank] = useState<string | null>(null);
@@ -95,6 +102,23 @@ export default function WithdrawPage({ balance, onWithdraw }: WithdrawPageProps)
   const formatBalance = (v: number) =>
     new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
 
+  const handleDeposit = async () => {
+    const amt = parseFloat(depositAmount);
+    if (!amt || amt < 10) { setDepositError('Минимальная сумма — 10 ₽'); return; }
+    setDepositLoading(true);
+    setDepositError('');
+    try {
+      const res = await onDeposit(amt);
+      window.open(res.payment_url, '_blank');
+      setShowDeposit(false);
+      setDepositAmount('');
+    } catch (e: unknown) {
+      setDepositError(e instanceof Error ? e.message : 'Ошибка. Попробуйте снова.');
+    } finally {
+      setDepositLoading(false);
+    }
+  };
+
   const handleWithdraw = async () => {
     if (!canWithdraw) return;
     setProcessing(true);
@@ -132,22 +156,32 @@ export default function WithdrawPage({ balance, onWithdraw }: WithdrawPageProps)
       </p>
 
       {/* Balance */}
-      <div className="card-glass rounded-xl p-4 mb-6 flex items-center justify-between">
-        <div>
-          <p className="text-xs text-muted-foreground mb-0.5">Доступно к выводу</p>
-          <p className="font-oswald text-2xl font-bold gold-text">{formatBalance(balance)} ₽</p>
+      <div className="card-glass rounded-xl p-4 mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <p className="text-xs text-muted-foreground mb-0.5">Доступно к выводу</p>
+            <p className="font-oswald text-2xl font-bold gold-text">{formatBalance(balance)} ₽</p>
+          </div>
+          {balance < MIN_WITHDRAW ? (
+            <div className="flex items-center gap-1.5 text-xs text-amber-400">
+              <Icon name="AlertCircle" size={14} />
+              <span>Мин. {MIN_WITHDRAW} ₽</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 text-xs text-green-400">
+              <Icon name="CheckCircle2" size={14} />
+              <span>Вывод доступен</span>
+            </div>
+          )}
         </div>
-        {balance < MIN_WITHDRAW ? (
-          <div className="flex items-center gap-1.5 text-xs text-amber-400">
-            <Icon name="AlertCircle" size={14} />
-            <span>Мин. {MIN_WITHDRAW} ₽</span>
-          </div>
-        ) : (
-          <div className="flex items-center gap-1.5 text-xs text-green-400">
-            <Icon name="CheckCircle2" size={14} />
-            <span>Вывод доступен</span>
-          </div>
-        )}
+        <button
+          onClick={() => setShowDeposit(true)}
+          className="w-full py-2.5 rounded-xl font-oswald font-bold text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-all hover:opacity-90"
+          style={{ background: 'linear-gradient(135deg, #1A56FF, #00B4FF)', color: '#fff' }}
+        >
+          <Icon name="Plus" size={16} />
+          Пополнить баланс
+        </button>
       </div>
 
       {/* Method toggle */}
@@ -448,6 +482,84 @@ export default function WithdrawPage({ balance, onWithdraw }: WithdrawPageProps)
       <p className="text-xs text-muted-foreground text-center mt-4">
         {method === 'sbp' ? 'СБП — мгновенный перевод · Комиссия 1%' : 'Обработка перевода: ~5 минут · Комиссия 1%'}
       </p>
+
+      {/* Deposit modal */}
+      {showDeposit && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center"
+          style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}
+          onClick={e => { if (e.target === e.currentTarget) setShowDeposit(false); }}
+        >
+          <div className="w-full max-w-lg rounded-t-2xl p-6 animate-slide-up" style={{ background: 'hsl(220 20% 10%)', border: '1px solid hsl(var(--border))' }}>
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'linear-gradient(135deg, #1A56FF, #00B4FF)' }}>
+                  <Icon name="Plus" size={18} className="text-white" />
+                </div>
+                <div>
+                  <p className="font-oswald font-bold text-lg text-foreground">Пополнение баланса</p>
+                  <p className="text-xs text-muted-foreground">Через Robokassa — карта, СБП, кошельки</p>
+                </div>
+              </div>
+              <button onClick={() => setShowDeposit(false)} className="text-muted-foreground hover:text-foreground transition-colors">
+                <Icon name="X" size={20} />
+              </button>
+            </div>
+
+            {/* Presets */}
+            <div className="grid grid-cols-3 gap-2 mb-4">
+              {DEPOSIT_PRESETS.map(p => (
+                <button
+                  key={p}
+                  onClick={() => setDepositAmount(String(p))}
+                  className="py-2.5 rounded-xl text-sm font-oswald font-bold transition-all hover:scale-105"
+                  style={{
+                    background: depositAmount === String(p) ? 'linear-gradient(135deg, #1A56FF, #00B4FF)' : 'hsl(var(--card))',
+                    color: depositAmount === String(p) ? '#fff' : 'hsl(var(--foreground))',
+                    border: `1px solid ${depositAmount === String(p) ? '#1A56FF' : 'hsl(var(--border))'}`,
+                  }}
+                >
+                  {p} ₽
+                </button>
+              ))}
+            </div>
+
+            {/* Custom amount */}
+            <div className="relative mb-4">
+              <input
+                type="number"
+                value={depositAmount}
+                onChange={e => setDepositAmount(e.target.value)}
+                placeholder="Своя сумма"
+                min={10}
+                className="w-full bg-input border border-border rounded-xl px-4 py-3.5 pr-12 text-foreground font-oswald text-lg focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-all"
+              />
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground">₽</span>
+            </div>
+
+            {depositError && (
+              <p className="text-xs text-red-400 mb-3 flex items-center gap-1">
+                <Icon name="AlertCircle" size={12} />
+                {depositError}
+              </p>
+            )}
+
+            <button
+              onClick={handleDeposit}
+              disabled={depositLoading || !depositAmount}
+              className="w-full py-3.5 rounded-xl font-oswald font-bold text-lg uppercase tracking-wide flex items-center justify-center gap-2 transition-all disabled:opacity-40"
+              style={{ background: 'linear-gradient(135deg, #1A56FF, #00B4FF)', color: '#fff', boxShadow: '0 4px 20px rgba(26,86,255,0.35)' }}
+            >
+              {depositLoading ? (
+                <><div className="w-5 h-5 rounded-full border-2 border-white border-t-transparent animate-spin" /> Создаём платёж...</>
+              ) : (
+                `Оплатить${depositAmount ? ` ${depositAmount} ₽` : ''}`
+              )}
+            </button>
+            <p className="text-xs text-muted-foreground text-center mt-3">Откроется страница оплаты Robokassa</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

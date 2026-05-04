@@ -1,0 +1,30 @@
+{
+  "tests": [
+    {
+      "name": "Create payment link",
+      "method": "POST",
+      "path": "/",
+      "headers": {"X-User-Id": "test_user_001"},
+      "body": {"amount": 500.0},
+      "expectedStatus": 200,
+      "expectedBody": {"ok": true},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Reject too small amount",
+      "method": "POST",
+      "path": "/",
+      "headers": {"X-User-Id": "test_user_001"},
+      "body": {"amount": 5.0},
+      "expectedStatus": 400,
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "OPTIONS preflight",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200,
+      "bodyMatcher": "partial"
+    }
+  ]
+}

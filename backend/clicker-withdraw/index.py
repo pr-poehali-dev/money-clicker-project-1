@@ -21,7 +21,12 @@ BANK_NAMES = {
     'sber': 'Сбербанк',
     'vtb': 'ВТБ',
     'rshb': 'Россельхозбанк',
-    'ymoney': 'ЮMoney',
+    'tinkoff': 'Т-Банк',
+    'alfa': 'Альфа-Банк',
+    'raiffeisen': 'Райффайзен',
+    'gazprom': 'Газпромбанк',
+    'otkritie': 'Открытие',
+    'other': 'Другой банк',
 }
 
 COMMISSION_RATE = 0.01
@@ -50,9 +55,9 @@ def handler(event: dict, context) -> dict:
             'headers': CORS_HEADERS,
             'body': json.dumps({'error': f'Минимальная сумма вывода {MIN_WITHDRAW} ₽'}, ensure_ascii=False)
         }
-    if bank not in BANK_NAMES:
-        return {'statusCode': 400, 'headers': CORS_HEADERS, 'body': json.dumps({'error': 'Неизвестный банк'}, ensure_ascii=False)}
-    if not account_number or len(account_number) < 10:
+    if not bank:
+        return {'statusCode': 400, 'headers': CORS_HEADERS, 'body': json.dumps({'error': 'Укажите банк'}, ensure_ascii=False)}
+    if not account_number or len(account_number) < 6:
         return {'statusCode': 400, 'headers': CORS_HEADERS, 'body': json.dumps({'error': 'Некорректные реквизиты'}, ensure_ascii=False)}
 
     commission = round(amount * COMMISSION_RATE, 2)
@@ -84,7 +89,7 @@ def handler(event: dict, context) -> dict:
 
                 # Create withdrawal transaction (status: pending — обрабатывается ~5 мин)
                 tx_id = str(uuid.uuid4())
-                bank_name = BANK_NAMES[bank]
+                bank_name = BANK_NAMES.get(bank, bank)
                 cur.execute(
                     "INSERT INTO transactions (id, user_id, type, amount, commission, bank, account_number, status, description) "
                     "VALUES (%s, %s, 'withdraw', %s, %s, %s, %s, 'pending', %s)",
